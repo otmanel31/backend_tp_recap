@@ -2,17 +2,14 @@ const express = require('express')
 const app = express()
 const path = require('path')
 const db = require(path.join(__dirname,'models', 'index.js'))
-
-const bodyParser = require('body-parser')
 const env = process.env.NODE_ENV || 'development'
 const inspect = require('util').inspect
 
+
+const bodyParser = require('body-parser')
 const methodOverride = require('method-override')
-
-
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({ extended: true}))
-app.use(methodOverride('_method', {methods: ['GET', 'POST']}))
+const expressSession = require('express-session')
+const cookieParser = require('cookie-parser')
 
 // template engine configuration
 app.set("views", require('path').join(__dirname, "views"))
@@ -20,12 +17,71 @@ app.set("view engine", "hbs")
 // set hbs partials directory
 require('hbs').registerPartials(path.join(__dirname, 'views', 'partials'))
 
+// authentication with passport-local
+// configuration
+const passport = require('passport')
+const LocalStrategy = require('passport-local').Strategy
+
+passport.use(new LocalStrategy(
+  function(username, password, cb) {
+    db.User.findOne({
+      attributes: ['id', 'login', 'email', 'password'],
+      where: {
+        login: username
+      }
+    })
+    .then( user => {
+      let userVals = user.get({plain: true})
+      if (!userVals)
+        return cb(null, false)
+      if (user.password !== password)
+        return cb(null, false)
+      return cb(null, userVals)
+    })
+  }))
+
+// store user Id into session
+passport.serializeUser((user, cb) => cb(null, user.id))
+
+// retreive user from session
+passport.deserializeUser((id, cb) => {
+  db.User.findById(id)
+    .then(user => {
+      let userVals = user.get({plain: true})
+      cb(null, userVals)
+    })
+    .catch(e => cb(err))
+})
+
+// middleware to protect a route
+// if not looged in, store requested url and redirect to login page
+ensureLoogedIn = (req, res, next) => {
+  if (!req.user) {
+    req.session.redirect_to = req.url
+    res.redirect('/session/new')
+  }
+  next()
+}
+
+// middlewares
+app.use(cookieParser())
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true}))
+app.use(methodOverride('_method', {methods: ['GET', 'POST']}))
+app.use(expressSession({ secret: 'miaou', resave: false, saveUninitialized: false }))
+
+// Initialize Passport 
+app.use(passport.initialize())
+// restore authentication state from session
+app.use(passport.session())
 
 
 // debug middleware
 if (env === 'development')
   app.use((req, res, next) => {
     console.log(`req: ${req.method} ${req.url}`)
+//    if (req.session)
+//      console.log(`session: ${inspect(req.session)}`)
     next()
   })
 
@@ -33,7 +89,40 @@ if (env === 'development')
 // in directory assets
 app.use(express.static('assets'))
 
-app.get('/', (req, res) => res.render('index'))
+
+// routes definitions
+app.get('/', (req, res) => res.render('index', {content: '<a href="/private" >zone privée</a>'}))
+
+app.get('/private', ensureLoogedIn,
+        (req, res) => res.render('index', {content: 'vous êtes dans la zone!'})
+)
+
+
+// session routes
+app.get('/session/new', (req, res) => {
+  res.render('session/new')
+})
+
+app.post('/session',
+         passport.authenticate('local', { failureRedirect: '/session/new'}),
+         (req, res) => {
+           let redirection = '/'
+           if (req.session.redirect_to) {
+
+             redirection = req.session.redirect_to
+             delete req.session.redirect_to
+           }
+           console.log('redirect_to ' + redirection)
+           res.redirect(redirection)
+         })
+
+app.delete('/session', (req, res) => {
+  req.logout()
+  res.redirect('/')
+})
+
+
+// Users routes
 
 // creation form
 app.get('/users/new', (req, res) => {

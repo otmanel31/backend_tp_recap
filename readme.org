@@ -1,150 +1,65 @@
-* Gestion d'utilisateurs
+* Authentifiaction avec passport.js
 
-L'application de ce dépôt permet de gérer le modèle ~User~,
-stocké dans une base de données relationnelles, ici ~sqlite3~.
+Mettons en place l'authentification en utilisant [[http://passportjs.org/][passport.js]].
+Cette librairie permet d'utiliser des modules séparés pour différentes méthodes
+d'authentification.
 
-** Test initial
+** Vérification login/password, session avec cookies
 
-Après avoir forké le projet dans gitlab dans votre espace personnel, puis cloner
-le dépôt sur votre machine:
+Le code fournit montre l'utilisation et la configuration de ~passport~.
 
-#+BEGIN_SRC shell
-$> npm install # installation des dépendances
-$> npm install -g sequelize-cli 
-$> sequelize db:migrate # initialise db/development.sqlite3
-$> npm start # démarre l'application
-#+END_SRC
+*** Configuration
 
-Testez l'application en vous rendant sur [[http://localhost:3000]]
-
-Explorer les différentes routes exposées dans [[./server.js][server.js]]
-
-
-** Nodemon
-
-La commande ~start~ définie dans [[package.json]] utilise [[https://github.com/remy/nodemon][nodemon]], qui redémarre
-automatiquement le serveur après toute modification d'un des fichiers du
-répertoire.
-
-Testez !
-
-La commande utilisée pour l'installer était:
-
-#+BEGIN_SRC shell
-npm install --save-dev nodemon
-#+END_SRC
-
-** Templates, partials & layout
-
-Comprenez les rôles respectifs de:
-- [[./views/layout.hbs][views/layout.hbs]]
-- [[./views/partials/header.html][views/partials/header.html]]
-
-Faites un peu de mise en page en personnalisant l'entête et le pied de page.
-
-Rajouter un template partiel à partir de ~views/index.hbs~
-Vous pouvez également personnaliser les css.
-
-Notez la configuration:
+La configuration utilise une session, avec stockage de l'identifiant de session
+dans un cookie.
 
 #+BEGIN_SRC javascript
-require('hbs').registerPartials(path.join(__dirname, 'views', 'partials'))
+// middlewares
+app.use(cookieParser())
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true}))
+app.use(methodOverride('_method', {methods: ['GET', 'POST']}))
+app.use(expressSession({ secret: 'miaou', resave: false, saveUninitialized: false }))
+
+// Initialize Passport 
+app.use(passport.initialize())
+// restore authentication state from session
+app.use(passport.session())
 #+END_SRC
 
-
-** Middleware
-
-Étudiez les middlewares utilisés, et expliciter pour chacun l'usage.
-
-En particulier:
-
-- ~express.static('assets')~
-- ~app.use(bodyParser.urlencoded({ extended: true}))~ : que permet la
-  configuration ~extended: true~ ?
-
-** Partie modèle, validation
-
-Le modèle a été initialement créé avec:
-
-#+BEGIN_SRC shell
-sequelize model:create --name User --attributes "login:string, password:string, email:string"
-#+END_SRC
-
-Des règles supplémentaires ont été rajoutées dans le fichier de migration ainsi
-produit, qui entraîne des restrictions:
+La configuration de la stratégie ~passport-local~ nécessite de fournir une fonction qui va
+vérifier l'identité d'un utilisateur à partir d'un ~username~ et d'un
+~password~:
 
 #+BEGIN_SRC javascript
-  login: {
-    type: Sequelize.STRING,
-    allowNull: false,
-    unique: true
-  },
-  email: {
-    type: Sequelize.STRING,
-    unique: true,
-    allowNull: false
-  }
+passport.use(new LocalStrategy(
+  (username, password, cb) => {
+    // verify that a user matches username and password
+    // ok cb(null, user)
+    // not ok : cb(null, false)
+    // error : cb(err)
+})
 #+END_SRC
 
-Les attributs ~login~ et ~email~ ont été rendus obligatoires.
-Cela entraîne une erreur si on essaye d'insérer un enregistrement dénué de ces
-valeurs.
+L'implémentation fournie utilise le modèle sequelize déjà vu.
 
-~login~ est également qualifé d'~unique~, ce qui interdit 2 enregistrements avec
-des valeurs identiques.
+*** Persistence de l'authentification
 
-Dans le fichier [[./models/user.js]], une [[http://docs.sequelizejs.com/en/v3/docs/models-definition/#validations][règle de validation]] a également été
-ajoutée sur ~password~:
+La session est utilisé pour faire persister l'authentification sur plusieurs
+requêtes successives.
 
-#+BEGIN_SRC javascript
-  password: {
-    type: DataTypes.STRING,
-    validate: {
-      len: [7,15]
-    }
-  }
-#+END_SRC
+Les fonctions ~passport.serializeUser~ et ~passport.deserializeUser~ vont
+ stocker/restaurer une représentation de l'utilisateur dans ~req.session~.
 
-Cette règle fixe une longueur entre 7 et 15 caractères.
+*** Utilisation
 
-Testez ces différentes contraintes de création dans l'interpréteur ~node~, et regarder le
-format des erreurs renvoyées.
+Suivez le déroulement des appels, en commençant à partir de
+[[http://localhost:3000/private]]
 
-#+BEGIN_SRC javascript
-const db = require('./models/index')
-
-// exemple qui marche
-db.User.create({login: 'bob', email: 'blib', password: '1234567'})
-  .then(user => console.log(user))
-  .catch(e => console.log(e))
-
-// exemple générant une erreur
-db.User.create({login: 'bob', email: 'blib', password: '1234567'})
-  .then(console.log)
-  .catch(console.log)
-#+END_SRC
-
-** Enchaîner les écrans
-
-Modifiez le code pour avoir le scénario suivant:
-
-- ~GET /~ redirige sur la liste des utilisateurs
-- la liste des utilisateurs affiche un lien pour créer un nouvel utilisateur
-- la page affichant un utilisateur affiche des liens pour modifier et détruire
-  l'utilisateur courant
-- la liste offre pour chaque utilisateur la possibilité de modifier, afficher ou
-  supprimer l'utilisateur
-
-** Recherche avec argument
-
-Modifiez la route ~GET /users~ pour retourner les utilisateurs dont le login ou
-l'email correspondent au paramètre de requête ~search~.
-
-Exemple : ~GET /users?search=abc~ doit renvoyer uniquement les utilisateurs dont
-le login ou l'email comportent ~abc~.
-
-Regardez les options possibles pour faire une [[http://docs.sequelizejs.com/en/v3/docs/querying/][requête avec sequelize]].
-
+1. le middleware ~ensureLoogedIn~ est appelé: il teste si ~req.user~ existe, et
+   redirige vers la page de login si ce n'est pas le cas, et stocke également
+   l'url initialement demandée.
+2. 
 * COMMENT plan
 
 factorisation de db.User.findById et 404
