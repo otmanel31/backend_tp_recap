@@ -143,6 +143,7 @@ l'email correspondent au paramètre de requête ~search~.
 Exemple : ~GET /users?search=abc~ doit renvoyer uniquement les utilisateurs dont
 le login ou l'email comportent ~abc~.
 
+Regardez les options possibles pour faire une [[http://docs.sequelizejs.com/en/v3/docs/querying/][requête avec sequelize]].
 
 * COMMENT plan
 
