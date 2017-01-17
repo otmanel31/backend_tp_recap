@@ -1,0 +1,171 @@
+* Gestion d'utilisateurs
+
+L'application de ce dépôt permet de gérer le modèle ~User~,
+stocké dans une base de données relationnelles, ici ~sqlite3~.
+
+** Test initial
+
+Après avoir forké le projet dans gitlab dans votre espace personnel, puis cloner
+le dépôt sur votre machine:
+
+#+BEGIN_SRC shell
+$> npm install # installation des dépendances
+$> npm install -g sequelize-cli 
+$> sequelize db:migrate # initialise db/development.sqlite3
+$> npm start # démarre l'application
+#+END_SRC
+
+Testez l'application en vous rendant sur [[http://localhost:3000]]
+
+Explorer les différentes routes exposées dans [[./server.js][server.js]]
+
+
+** Nodemon
+
+La commande ~start~ définie dans [[package.json]] utilise [[https://github.com/remy/nodemon][nodemon]], qui redémarre
+automatiquement le serveur après toute modification d'un des fichiers du
+répertoire.
+
+Testez !
+
+La commande utilisée pour l'installer était:
+
+#+BEGIN_SRC shell
+npm install --save-dev nodemon
+#+END_SRC
+
+** Templates, partials & layout
+
+Comprenez les rôles respectifs de:
+- [[./views/layout.hbs][views/layout.hbs]]
+- [[./views/partials/header.html][views/partials/header.html]]
+
+Faites un peu de mise en page en personnalisant l'entête et le pied de page.
+
+Rajouter un template partiel à partir de ~views/index.hbs~
+Vous pouvez également personnaliser les css.
+
+Notez la configuration:
+
+#+BEGIN_SRC javascript
+require('hbs').registerPartials(path.join(__dirname, 'views', 'partials'))
+#+END_SRC
+
+
+** Middleware
+
+Étudiez les middlewares utilisés, et expliciter pour chacun l'usage.
+
+En particulier:
+
+- ~express.static('assets')~
+- ~app.use(bodyParser.urlencoded({ extended: true}))~ : que permet la
+  configuration ~extended: true~ ?
+
+** Partie modèle, validation
+
+Le modèle a été initialement créé avec:
+
+#+BEGIN_SRC shell
+sequelize model:create --name User --attributes "login:string, password:string, email:string"
+#+END_SRC
+
+Des règles supplémentaires ont été rajoutées dans le fichier de migration ainsi
+produit, qui entraîne des restrictions:
+
+#+BEGIN_SRC javascript
+  login: {
+    type: Sequelize.STRING,
+    allowNull: false,
+    unique: true
+  },
+  email: {
+    type: Sequelize.STRING,
+    unique: true,
+    allowNull: false
+  }
+#+END_SRC
+
+Les attributs ~login~ et ~email~ ont été rendus obligatoires.
+Cela entraîne une erreur si on essaye d'insérer un enregistrement dénué de ces
+valeurs.
+
+~login~ est également qualifé d'~unique~, ce qui interdit 2 enregistrements avec
+des valeurs identiques.
+
+Dans le fichier [[./models/user.js]], une [[http://docs.sequelizejs.com/en/v3/docs/models-definition/#validations][règle de validation]] a également été
+ajoutée sur ~password~:
+
+#+BEGIN_SRC javascript
+  password: {
+    type: DataTypes.STRING,
+    validate: {
+      len: [7,15]
+    }
+  }
+#+END_SRC
+
+Cette règle fixe une longueur entre 7 et 15 caractères.
+
+Testez ces différentes contraintes de création dans l'interpréteur ~node~, et regarder le
+format des erreurs renvoyées.
+
+#+BEGIN_SRC javascript
+const db = require('./models/index')
+
+// exemple qui marche
+db.User.create({login: 'bob', email: 'blib', password: '1234567'})
+  .then(user => console.log(user))
+  .catch(e => console.log(e))
+
+// exemple générant une erreur
+db.User.create({login: 'bob', email: 'blib', password: '1234567'})
+  .then(console.log)
+  .catch(console.log)
+#+END_SRC
+
+** Enchaîner les écrans
+
+Modifiez le code pour avoir le scénario suivant:
+
+- ~GET /~ redirige sur la liste des utilisateurs
+- la liste des utilisateurs affiche un lien pour créer un nouvel utilisateur
+- la page affichant un utilisateur affiche des liens pour modifier et détruire
+  l'utilisateur courant
+- la liste offre pour chaque utilisateur la possibilité de modifier, afficher ou
+  supprimer l'utilisateur
+
+** Recherche avec argument
+
+Modifiez la route ~GET /users~ pour retourner les utilisateurs dont le login ou
+l'email correspondent au paramètre de requête ~search~.
+
+Exemple : ~GET /users?search=abc~ doit renvoyer uniquement les utilisateurs dont
+le login ou l'email comportent ~abc~.
+
+
+* COMMENT plan
+
+factorisation de db.User.findById et 404
+
+routage REST
+servir à la fois json et html
+que du html pour la 1ère séance, rajouter le json en 2e partie
+
+pratiquer les bases de données : fournir le module pour la gestion user
+
+faire utiliser passport
+
+bounty hunter:
+
+proposer un sujet de bounty, requière auth
+rajouter une somme
+proposer solution à bounty
+valider solution
+
+relation bounty/auteur
+
+devra être repris dans la partie SPA comme exemple
+
+
+

@@ -1,0 +1,19 @@
+<table>
+  <thead>
+    <tr>
+      <th>Login</th>
+      <th>email</th>
+    </tr>
+  </thead>
+  {{#each users}}
+    <tr>
+      <td>{{login}}</td>
+      <td>{{email}}</td>
+      <td>
+        <a href="/users/{{id}}?_method=delete">
+          <button>Destroy</button>
+        </a>
+      </td>
+    </tr>
+  {{/each}}
+</table>

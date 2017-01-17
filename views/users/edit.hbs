@@ -1,0 +1,22 @@
+{{#if messages}}
+  {{#each messages}}
+    <div class="error">{{this}}</div>
+  {{/each}}
+{{/if}}
+
+
+<form action="/users/{{user.id}}?_method=put" method="post">
+  <label>Login
+    <input type="text" name="user[login]" placeholder="login" value="{{user.login}}" />
+  </label>
+  <br>
+  <label>Email
+    <input type="email" name="user[email]" placeholder="identity@domain.ex" value="{{user.email}}" />
+  </label>
+  <br>
+  <label>Password
+    <input type="password" name="user[password]" placeholder="password" value="" />
+  </label>
+  <br>
+  <button type="submit">Update</button>
+</form>
