@@ -24,30 +24,40 @@ const LocalStrategy = require('passport-local').Strategy
 
 passport.use(new LocalStrategy(
   function(username, password, cb) {
+    console.log(`search in db.User username=${username} password=*****`)
     db.User.findOne({
       attributes: ['id', 'login', 'email', 'password'],
       where: {
         login: username
       }
     })
-    .then( user => {
-      let userVals = user.get({plain: true})
-      if (!userVals)
-        return cb(null, false)
-      if (user.password !== password)
-        return cb(null, false)
-      return cb(null, userVals)
-    })
+      .then(user => {
+        let userVals = user.get({plain: true})
+        console.log(`user found: ${inspect(userVals)}`)
+        return user
+      })
+      .then( user => {
+        let userVals = user.get({plain: true})
+        if (!userVals)
+          return cb(null, false)
+        if (user.password !== password)
+          return cb(null, false)
+        return cb(null, userVals)
+      })
   }))
 
 // store user Id into session
-passport.serializeUser((user, cb) => cb(null, user.id))
+passport.serializeUser((user, cb) => {
+  console.log(`store user.id=${user.id} into session`)
+  cb(null, user.id)
+})
 
 // retreive user from session
 passport.deserializeUser((id, cb) => {
   db.User.findById(id)
     .then(user => {
       let userVals = user.get({plain: true})
+      console.log(`from id=${id} restore req.user to ${inspect(userVals)} `)
       cb(null, userVals)
     })
     .catch(e => cb(err))
@@ -57,9 +67,11 @@ passport.deserializeUser((id, cb) => {
 // if not looged in, store requested url and redirect to login page
 ensureLoogedIn = (req, res, next) => {
   if (!req.user) {
+    console.log(`ensureLoogedIn: not connected, redirect to /session/new`)
     req.session.redirect_to = req.url
     res.redirect('/session/new')
   }
+  
   next()
 }
 
@@ -94,6 +106,10 @@ app.use(express.static('assets'))
 app.get('/', (req, res) => res.render('index', {content: '<a href="/private" >zone privée</a>'}))
 
 app.get('/private', ensureLoogedIn,
+        (req, res, next) => {
+          console.log(`authenticated with user=${inspect(req.user)}`)
+          next()
+        },
         (req, res) => res.render('index', {content: 'vous êtes dans la zone!'})
 )
 
@@ -104,6 +120,10 @@ app.get('/session/new', (req, res) => {
 })
 
 app.post('/session',
+         (req, res, next) => {
+           console.log(`just before passport.authenticate`)
+           next()
+         },
          passport.authenticate('local', { failureRedirect: '/session/new'}),
          (req, res) => {
            let redirection = '/'
