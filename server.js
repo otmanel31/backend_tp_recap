@@ -112,7 +112,6 @@ app.post('/session',
              redirection = req.session.redirect_to
              delete req.session.redirect_to
            }
-           console.log('redirect_to ' + redirection)
            res.redirect(redirection)
          })
 

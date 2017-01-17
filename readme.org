@@ -51,6 +51,8 @@ requêtes successives.
 Les fonctions ~passport.serializeUser~ et ~passport.deserializeUser~ vont
  stocker/restaurer une représentation de l'utilisateur dans ~req.session~.
 
+La représentation de l'utilisateur est rendu disponible dans ~req.user~
+
 *** Utilisation
 
 Suivez le déroulement des appels, en commençant à partir de
@@ -59,7 +61,26 @@ Suivez le déroulement des appels, en commençant à partir de
 1. le middleware ~ensureLoogedIn~ est appelé: il teste si ~req.user~ existe, et
    redirige vers la page de login si ce n'est pas le cas, et stocke également
    l'url initialement demandée.
-2. 
+2. Supposons que l'on n'est pas encore authentifié : ~req.user~ n'existe pas. On
+   redirige le client vers la page de connexion ~/session/new~. L'utilisateur
+   renseigne le formulaire, valide.
+3. La route du traitement des données du formulaire est ~POST /session~. Le
+   middleware ~passport.authenticate~ est utilisé pour vérifier l'identité. Ce
+   middleware fait appel à la fonction définie lors de la configuration. Si la
+   fonction renvoie un utilisateur, alors ~passport.authenticate~ laisse passer
+   la requête, sinon redirige vers la valeur de l'option ~failureRedirect~.
+4. On suppose que l'utilisateur s'est correctement authentifé: la session est
+   crée, le moyen de retrouver l'utilisateur (ici ~user.id~) est stocké dans la
+   session par l'appel de ~passport.serializeUser~. Le client est ensuite
+   redirigé vers la page initialement demandée.
+5. Le client refait donc la requête ~GET /private~. Le middleware
+   ~passport.session()~ appelle la fonction ~passport.deserializeUser~ pour
+   reconstruire ~req.user~ à partir de ~user.id~ qui avait été stocké. Du coup,
+   lors du passage dans ~ensureLoogedIn~, ~req.user~ existe, et donc on passe au
+   vrai traitement !
+
+
+
 * COMMENT plan
 
 factorisation de db.User.findById et 404
